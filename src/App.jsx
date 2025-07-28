@@ -3,7 +3,7 @@ import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { GameProvider } from './context/GameContext';
 import AppRoutes from './routes/AppRoutes';
-import BackgroundMusic from './components/backgroundMusic';
+import BackgroundMusic from './components/BackgroundMusic';
 
 export default function App() {
   return (
