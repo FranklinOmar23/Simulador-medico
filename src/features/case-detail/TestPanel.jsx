@@ -1,14 +1,20 @@
-import React, { useState } from 'react';
+// src/features/case-detail/TestPanel.jsx
+
+import React, { useState, useEffect } from 'react';
 
 export default function TestPanel({ caseData }) {
   const { availableTests } = caseData;
   const [inProgress, setInProgress] = useState({});
   const [results, setResults] = useState({});
 
+  // reset state when the case changes
+  useEffect(() => {
+    setInProgress({});
+    setResults({});
+  }, [caseData.id]);
+
   const orderTest = test => {
-    // Marcar como en progreso
     setInProgress(ip => ({ ...ip, [test.id]: true }));
-    // Al cabo de durationSec, completar
     setTimeout(() => {
       setResults(rs => ({ ...rs, [test.id]: test.results }));
       setInProgress(ip => {
@@ -24,7 +30,10 @@ export default function TestPanel({ caseData }) {
       <h4 className="font-medium mb-2">Pruebas Disponibles</h4>
       <div className="space-y-2">
         {availableTests.map(t => (
-          <div key={t.id} className="flex justify-between items-center border border-gray-200 rounded p-2">
+          <div
+            key={t.id}
+            className="flex justify-between items-center border border-gray-200 rounded p-2"
+          >
             <div>
               <p className="font-medium">{t.name}</p>
               <p className="text-sm text-gray-600">
@@ -46,14 +55,21 @@ export default function TestPanel({ caseData }) {
         ))}
       </div>
 
-      {/* Resultados */}
       {Object.keys(results).length > 0 && (
         <div className="mt-4">
           <h4 className="font-medium mb-2">Resultados</h4>
           <div className="space-y-3">
             {Object.entries(results).map(([testId, res]) => (
-              <div key={testId} className="border border-gray-200 rounded p-2 bg-green-50">
-                <p className="font-medium">{availableTests.find(t => t.id === testId)?.name}</p>
+              <div
+                key={testId}
+                className="border border-gray-200 rounded p-2 bg-green-50"
+              >
+                <p className="font-medium">
+                  {
+                    availableTests.find(t => t.id === testId)
+                      ?.name
+                  }
+                </p>
                 <ul className="text-gray-700 list-disc list-inside">
                   {Object.entries(res).map(([param, value]) => (
                     <li key={param}>
@@ -67,5 +83,5 @@ export default function TestPanel({ caseData }) {
         </div>
       )}
     </div>
-);
+  );
 }

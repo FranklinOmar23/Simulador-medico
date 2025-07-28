@@ -10,14 +10,13 @@ export default function CaseCard({ caseItem }) {
   const { startCase } = useContext(GameContext);
   const {
     id,
-    difficulty,
+    difficulty = 'fácil',
     presentingComplaint,
     patient,
-    availableTests = [],
     diagnoses = []
   } = caseItem;
 
-  // Mapas de estilos e iconos según dificultad
+  // Configuración de badge según dificultad
   const badgeConfig = {
     fácil: {
       styles: 'bg-green-100 text-green-700',
@@ -33,17 +32,23 @@ export default function CaseCard({ caseItem }) {
     }
   };
 
-  // Cálculo de XP y tiempo estimado
+  // Mapa de tiempo en minutos según dificultad
+  const timeMapMin = {
+    fácil: 1.5,
+    normal: 2.5,
+    difícil: 4
+  };
+  const estMin = timeMapMin[difficulty] ?? timeMapMin['fácil'];
+
+  // Cálculo de XP (máximo de los diagnósticos posibles)
   const xpValue = diagnoses.reduce((max, d) => Math.max(max, d.xp), 0);
-  const totalSec = availableTests.reduce((sum, t) => sum + (t.durationSec || 0), 0);
-  const estMin = Math.ceil(totalSec / 60);
 
   const handleAttend = () => {
     startCase(id);
     navigate(`/case/${id}`);
   };
 
-  const { styles, icon } = badgeConfig[difficulty] || badgeConfig['fácil'];
+  const { styles, icon } = badgeConfig[difficulty];
 
   return (
     <div className="bg-white rounded border border-gray-200 p-4 flex flex-col">
@@ -55,7 +60,6 @@ export default function CaseCard({ caseItem }) {
             {patient.age} años • {patient.sex}
           </p>
         </div>
-
         <span className={`ml-auto inline-flex items-center px-2 py-1 rounded-full text-sm ${styles}`}>
           {icon}
           <span className="ml-1 capitalize">{difficulty}</span>
@@ -66,9 +70,15 @@ export default function CaseCard({ caseItem }) {
         <span className="font-medium">Motivo de consulta:</span> {presentingComplaint}
       </p>
 
-      <div className="flex items-center text-gray-600 text-sm mb-4 space-x-4">
-        <div>⭐ {xpValue} XP</div>
-        <div>⏱️ {estMin} min</div>
+      <div className="flex items-center text-gray-600 text-sm mb-4 space-x-6">
+        <div className="flex items-center space-x-1">
+          <span>⭐</span>
+          <span>{xpValue} XP</span>
+        </div>
+        <div className="flex items-center space-x-1">
+          <span>⏱️</span>
+          <span>{estMin} min</span>
+        </div>
       </div>
 
       <button

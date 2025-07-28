@@ -5,17 +5,17 @@ import React, { createContext, useState, useEffect } from 'react';
 export const GameContext = createContext({
   xp: 0,
   casesResolved: 0,
+  resolvedIds: [],
   currentCaseId: null,
   startCase: () => {},
   finishCase: () => {},
 });
 
 export function GameProvider({ children }) {
-  // Inicializar desde localStorage, o con valores por defecto
   const [xp, setXp] = useState(() => {
     try {
-      const saved = localStorage.getItem('medSimProgress');
-      return saved ? JSON.parse(saved).xp : 0;
+      const saved = JSON.parse(localStorage.getItem('medSimProgress'));
+      return saved?.xp ?? 0;
     } catch {
       return 0;
     }
@@ -23,36 +23,43 @@ export function GameProvider({ children }) {
 
   const [casesResolved, setCasesResolved] = useState(() => {
     try {
-      const saved = localStorage.getItem('medSimProgress');
-      return saved ? JSON.parse(saved).casesResolved : 0;
+      const saved = JSON.parse(localStorage.getItem('medSimProgress'));
+      return saved?.casesResolved ?? 0;
     } catch {
       return 0;
     }
   });
 
+  const [resolvedIds, setResolvedIds] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('medSimProgress'));
+      return saved?.resolvedIds ?? [];
+    } catch {
+      return [];
+    }
+  });
+
   const [currentCaseId, setCurrentCaseId] = useState(null);
 
-  // Cada vez que xp o casesResolved cambian, guardamos en localStorage
   useEffect(() => {
     try {
       localStorage.setItem(
         'medSimProgress',
-        JSON.stringify({ xp, casesResolved })
+        JSON.stringify({ xp, casesResolved, resolvedIds })
       );
     } catch (err) {
-      console.error('Error saving progress to localStorage:', err);
+      console.error('Error saving progress:', err);
     }
-  }, [xp, casesResolved]);
+  }, [xp, casesResolved, resolvedIds]);
 
-  // Lanza un caso nuevo
-  const startCase = (id) => {
+  const startCase = id => {
     setCurrentCaseId(id);
   };
 
-  // Finaliza el caso: suma XP, cuenta un caso resuelto y limpia el caso activo
-  const finishCase = (earnedXp) => {
-    setXp((prev) => prev + earnedXp);
-    setCasesResolved((prev) => prev + 1);
+  const finishCase = earnedXp => {
+    setXp(prev => prev + earnedXp);
+    setCasesResolved(prev => prev + 1);
+    setResolvedIds(prev => [...prev, currentCaseId]);
     setCurrentCaseId(null);
   };
 
@@ -61,6 +68,7 @@ export function GameProvider({ children }) {
       value={{
         xp,
         casesResolved,
+        resolvedIds,
         currentCaseId,
         startCase,
         finishCase,
