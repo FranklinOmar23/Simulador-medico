@@ -1,0 +1,37 @@
+rules_version = '2';
+
+// Reglas de seguridad de Firestore para el simulador.
+// Pégalas en Consola de Firebase → Firestore Database → Reglas → Publicar.
+// Cada usuario solo puede leer y escribir su propio documento users/{uid},
+// y solo con los campos y tipos que usa la app.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{userId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function validProgress() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['xp', 'casesResolved', 'resolvedIds', 'seenRankIndex', 'displayName', 'updatedAt'])
+          && d.xp is int && d.xp >= 0 && d.xp <= 100000
+          && d.casesResolved is int && d.casesResolved >= 0 && d.casesResolved <= 1000
+          && d.resolvedIds is list && d.resolvedIds.size() <= 1000
+          && d.seenRankIndex is int && d.seenRankIndex >= 0 && d.seenRankIndex <= 10
+          && d.displayName is string && d.displayName.size() <= 100
+          && d.updatedAt == request.time;
+      }
+
+      allow read: if isOwner();
+      allow create, update: if isOwner() && validProgress();
+      allow delete: if false;
+    }
+
+    // Todo lo demás, cerrado
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

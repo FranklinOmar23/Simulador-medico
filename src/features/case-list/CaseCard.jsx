@@ -1,92 +1,76 @@
 // src/features/case-list/CaseCard.jsx
 
-import React, { useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { GameContext } from '../../context/GameContext';
-import { CheckCircle, HelpCircle, AlertTriangle } from 'lucide-react';
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, Clock, Star } from 'lucide-react';
+import Card from '../../components/Card';
+import Button from '../../components/Button';
+import DifficultyBadge from '../../components/DifficultyBadge';
+import PatientAvatar from '../../components/PatientAvatar';
+import { getDifficulty } from '../../lib/difficulty';
+import { getCaseXp } from '../../lib/scoring';
+import { getPatientMood } from '../../lib/patientMood';
 
 export default function CaseCard({ caseItem }) {
-  const navigate = useNavigate();
-  const { startCase } = useContext(GameContext);
   const {
     id,
     difficulty = 'fácil',
     presentingComplaint,
     patient,
-    diagnoses = []
+    specialty
   } = caseItem;
 
-  // Configuración de badge según dificultad
-  const badgeConfig = {
-    fácil: {
-      styles: 'bg-green-100 text-green-700',
-      icon: <CheckCircle size={16} />
-    },
-    normal: {
-      styles: 'bg-yellow-100 text-yellow-700',
-      icon: <HelpCircle size={16} />
-    },
-    difícil: {
-      styles: 'bg-red-100 text-red-700',
-      icon: <AlertTriangle size={16} />
-    }
-  };
+  // Tiempo estimado (el mismo que usa el temporizador del consultorio)
+  const estMin = getDifficulty(difficulty).timeSec / 60;
 
-  // Mapa de tiempo en minutos según dificultad
-  const timeMapMin = {
-    fácil: 1.5,
-    normal: 2.5,
-    difícil: 4
-  };
-  const estMin = timeMapMin[difficulty] ?? timeMapMin['fácil'];
-
-  // Cálculo de XP (máximo de los diagnósticos posibles)
-  const xpValue = diagnoses.reduce((max, d) => Math.max(max, d.xp), 0);
-
-  const handleAttend = () => {
-    startCase(id);
-    navigate(`/case/${id}`);
-  };
-
-  const { styles, icon } = badgeConfig[difficulty];
+  // XP máximo = XP del diagnóstico correcto
+  const xpValue = getCaseXp(caseItem);
 
   return (
-    <div className="bg-white rounded border border-gray-200 p-4 flex flex-col">
-      <div className="flex items-center mb-3">
-        <div className="w-10 h-10 bg-gray-200 rounded-full mr-3 flex-shrink-0" />
-        <div>
-          <h3 className="font-semibold">{patient.name}</h3>
-          <p className="text-sm text-gray-600">
-            {patient.age} años • {patient.sex}
+    <Card
+      as="article"
+      className="flex animate-fade-in flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-md"
+    >
+      <div className="flex items-start gap-3">
+        <PatientAvatar patient={patient} mood={getPatientMood(caseItem)} />
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate font-semibold text-slate-900">{patient.name}</h3>
+          <p className="text-sm text-slate-500">
+            {patient.age} años · {patient.sex}
           </p>
+          {specialty && <p className="mt-0.5 text-xs font-medium text-brand-700">{specialty}</p>}
         </div>
-        <span className={`ml-auto inline-flex items-center px-2 py-1 rounded-full text-sm ${styles}`}>
-          {icon}
-          <span className="ml-1 capitalize">{difficulty}</span>
-        </span>
+        <DifficultyBadge difficulty={difficulty} />
       </div>
 
-      <p className="flex-1 text-gray-700 mb-4">
-        <span className="font-medium">Motivo de consulta:</span> {presentingComplaint}
-      </p>
-
-      <div className="flex items-center text-gray-600 text-sm mb-4 space-x-6">
-        <div className="flex items-center space-x-1">
-          <span>⭐</span>
-          <span>{xpValue} XP</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <span>⏱️</span>
-          <span>{estMin} min</span>
-        </div>
+      <div className="mt-4 flex-1 rounded-xl bg-slate-50 p-3">
+        <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+          Motivo de consulta
+        </p>
+        <p className="mt-1 text-slate-800">{presentingComplaint}</p>
       </div>
 
-      <button
-        onClick={handleAttend}
-        className="self-end bg-black text-white px-4 py-2 rounded"
-      >
-        Atender
-      </button>
-    </div>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 text-sm whitespace-nowrap text-slate-600">
+          <span className="inline-flex items-center gap-1.5">
+            <Star className="size-4 fill-amber-400 text-amber-400" aria-hidden="true" />
+            {xpValue} XP
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="size-4 text-slate-400" aria-hidden="true" />
+            {estMin} min
+          </span>
+        </div>
+        <Button
+          as={Link}
+          to={`/case/${id}`}
+          size="sm"
+          aria-label={`Atender a ${patient.name}`}
+        >
+          Atender
+          <ArrowRight className="size-4" aria-hidden="true" />
+        </Button>
+      </div>
+    </Card>
   );
 }

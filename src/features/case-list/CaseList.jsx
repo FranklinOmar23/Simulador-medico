@@ -1,230 +1,313 @@
 // src/features/case-list/CaseList.jsx
 
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState } from 'react';
+import clsx from 'clsx';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  GraduationCap,
+  Siren,
+  Stethoscope,
+  Star,
+  Trophy
+} from 'lucide-react';
 import useCases from '../../hooks/useCases';
 import CaseCard from './CaseCard';
-import { GameContext } from '../../context/GameContext';
-import { Stethoscope, GraduationCap } from 'lucide-react';
+import Card from '../../components/Card';
+import Button from '../../components/Button';
+import Modal from '../../components/Modal';
+import AccountMenu from '../../components/AccountMenu';
+import MusicToggle from '../../components/MusicToggle';
+import { useGame } from '../../context/game-context';
+import { getRankProgress } from '../../lib/ranks';
+import { getRankStyle } from '../../lib/rankStyles';
+import { DIFFICULTIES } from '../../lib/difficulty';
+import { Link } from 'react-router-dom';
+import { useEmergency } from '../../context/emergency-context';
+import { formatClock } from '../../lib/emergency';
 
-function PromoModal({ nextRank, theme, onClose }) {
+function PromoModal({ rank, onClose }) {
+  const style = getRankStyle(rank);
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className={`rounded-lg p-6 max-w-sm mx-auto text-center space-y-4 ${theme.modalBg}`}>
-        <div className={theme.accentModal}>
-          <GraduationCap size={48} />
-        </div>
-        <h2 className={`text-2xl font-semibold ${theme.accentText}`}>¡ASCENSO!</h2>
-        <p className={`text-lg ${theme.accentText}`}>
-          Ahora eres <strong>{nextRank}</strong>
-        </p>
-        <p className="text-gray-600">
-          Los casos ahora serán más desafiantes. ¡A seguir aprendiendo!
-        </p>
-        <button
-          onClick={onClose}
-          className={`mt-4 px-4 py-2 rounded ${theme.buttonBg} ${theme.buttonText}`}
-        >
-          ¡Genial!
-        </button>
+    <Modal open onClose={onClose} labelledBy="promo-title" className="text-center">
+      <div className={clsx('mx-auto flex size-16 items-center justify-center rounded-2xl', style.icon)}>
+        <Trophy className="size-8" aria-hidden="true" />
       </div>
+      <p className="mt-5 text-xs font-semibold tracking-widest text-slate-500 uppercase">
+        ¡Ascenso!
+      </p>
+      <h2 id="promo-title" className="mt-1 text-2xl font-bold text-slate-900">
+        Ahora eres <span className={style.text}>{rank}</span>
+      </h2>
+      <p className="mt-2 text-slate-600">
+        Tu razonamiento clínico mejora. ¡Prueba con casos más difíciles!
+      </p>
+      <Button onClick={onClose} size="lg" className="mt-6 w-full" autoFocus>
+        Continuar
+      </Button>
+    </Modal>
+  );
+}
+
+function RankCard() {
+  const { xp, casesResolved, resolvedIds } = useGame();
+  const { current, next, pct } = getRankProgress(casesResolved);
+  const style = getRankStyle(current.rank);
+
+  const stats = [
+    { label: 'Diagnósticos correctos', value: casesResolved },
+    { label: 'Pacientes atendidos', value: resolvedIds.length },
+    { label: 'Experiencia', value: `${xp} XP` }
+  ];
+
+  return (
+    <Card className="p-5 sm:p-6">
+      <div className="flex items-center gap-4">
+        <div className={clsx('flex size-12 shrink-0 items-center justify-center rounded-2xl', style.icon)}>
+          <GraduationCap className="size-6" aria-hidden="true" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">Rango actual</p>
+          <h2 className={clsx('truncate text-xl font-semibold', style.text)}>{current.rank}</h2>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <div className="mb-2 flex items-baseline justify-between gap-2 text-sm">
+          <span className="text-slate-600">
+            {next ? (
+              <>
+                Siguiente: <span className="font-medium text-slate-900">{next.rank}</span>
+              </>
+            ) : (
+              '¡Has alcanzado el nivel máximo!'
+            )}
+          </span>
+          {next && (
+            <span className="text-slate-500 tabular-nums">
+              {casesResolved}/{next.threshold}
+            </span>
+          )}
+        </div>
+        <div
+          className="h-2.5 overflow-hidden rounded-full bg-slate-100"
+          role="progressbar"
+          aria-label="Progreso hacia el siguiente rango"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(pct)}
+        >
+          <div
+            className={clsx('h-full rounded-full transition-[width] duration-700', style.bar)}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        {next && (
+          <p className="mt-2 text-xs text-slate-500">
+            {next.threshold - casesResolved === 1
+              ? 'Te falta 1 diagnóstico correcto para ascender'
+              : `Te faltan ${next.threshold - casesResolved} diagnósticos correctos para ascender`}
+          </p>
+        )}
+      </div>
+
+      <dl className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
+        {stats.map(s => (
+          <div key={s.label} className="rounded-xl bg-slate-50 px-3 py-2.5">
+            <dt className="text-[11px] leading-tight text-slate-500 sm:text-xs">{s.label}</dt>
+            <dd className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{s.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
+  );
+}
+
+function DifficultyPicker({ value, onChange }) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Dificultad"
+      className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-200/60 p-1"
+    >
+      {Object.entries(DIFFICULTIES).map(([key, d]) => {
+        const active = value === key;
+        return (
+          <button
+            key={key}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(key)}
+            className={clsx(
+              'rounded-xl px-2 py-2 text-center transition',
+              active ? 'bg-white shadow-sm' : 'hover:bg-white/60'
+            )}
+          >
+            <span
+              className={clsx(
+                'flex items-center justify-center gap-1.5 text-sm font-medium',
+                active ? 'text-slate-900' : 'text-slate-600'
+              )}
+            >
+              <d.Icon className="size-4" aria-hidden="true" />
+              {d.label}
+            </span>
+            <span className="hidden text-xs text-slate-500 sm:block">{d.description}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function EmptyState({ icon: Icon, tone, title, children }) {
+  return (
+    <Card className="animate-fade-in px-6 py-10 text-center">
+      <div className={clsx('mx-auto flex size-12 items-center justify-center rounded-2xl', tone)}>
+        <Icon className="size-6" aria-hidden="true" />
+      </div>
+      <h3 className="mt-4 font-semibold text-slate-900">{title}</h3>
+      <div className="mt-1 text-sm text-slate-500">{children}</div>
+    </Card>
+  );
+}
+
+function CardSkeleton() {
+  return (
+    <Card className="animate-pulse p-5" aria-hidden="true">
+      <div className="flex items-center gap-3">
+        <div className="size-12 rounded-full bg-slate-200" />
+        <div className="flex-1 space-y-2">
+          <div className="h-3.5 w-2/3 rounded bg-slate-200" />
+          <div className="h-3 w-1/3 rounded bg-slate-200" />
+        </div>
+      </div>
+      <div className="mt-4 h-16 rounded-xl bg-slate-100" />
+      <div className="mt-4 h-8 rounded-xl bg-slate-100" />
+    </Card>
+  );
+}
+
+// Recordatorio de una emergencia aceptada que sigue sin resolver
+function ActiveEmergencyBanner({ cases }) {
+  const { active, now } = useEmergency();
+  const emergencyCase = active && cases.find(c => c.id === active.caseId);
+  if (!emergencyCase) return null;
+
+  const left = Math.max(0, Math.ceil((active.deadline - now) / 1000));
+
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center gap-3 rounded-2xl bg-rose-50 p-4 text-rose-900 ring-1 ring-rose-600/20 ring-inset"
+    >
+      <Siren className="size-5 shrink-0 animate-pulse text-rose-600" aria-hidden="true" />
+      <p className="min-w-[12rem] flex-1 text-sm">
+        <span className="font-semibold">Emergencia en curso:</span> {emergencyCase.patient.name}.{' '}
+        {left > 0 ? `Quedan ${formatClock(left)}.` : 'El tiempo se agotó: envía tu diagnóstico.'}
+      </p>
+      <Button as={Link} to={`/case/${emergencyCase.id}`} variant="danger" size="sm">
+        Volver a la emergencia
+      </Button>
     </div>
   );
 }
 
 export default function CaseList() {
-  const allCases = useCases();
-  const { xp, casesResolved, resolvedIds } = useContext(GameContext);
+  const { cases: allCases, status, reload } = useCases();
+  const { xp, resolvedIds, promotion, dismissPromotion } = useGame();
   const [selectedDifficulty, setSelectedDifficulty] = useState('fácil');
-  const [showPromo, setShowPromo] = useState(false);
 
-  const rankThresholds = [
-    { rank: 'Estudiante de Medicina', threshold: 0 },
-    { rank: 'Interno Clínico',        threshold: 3 },
-    { rank: 'Médico General',         threshold: 6 },
-    { rank: 'Residente',              threshold: 10 },
-    { rank: 'Especialista',           threshold: 15 },
-    { rank: 'Profesor Clínico',       threshold: Infinity }
-  ];
-
-  const currentIndex =
-    rankThresholds.findIndex(r => casesResolved < r.threshold) - 1;
-  const currentRankInfo = rankThresholds[currentIndex] || rankThresholds[0];
-  const nextRankInfo    = rankThresholds[currentIndex + 1];
-  const nextThreshold   = nextRankInfo.threshold;
-  const nextRank        = nextRankInfo.rank;
-
-  const progressPct =
-    nextThreshold === Infinity
-      ? 100
-      : Math.min((casesResolved / nextThreshold) * 100, 100);
-
-  const themeConfig = {
-    'Estudiante de Medicina': {
-      headerBg:     'bg-white',
-      accent:       'text-blue-600',
-      cardHeaderBg: 'bg-white',
-      cardBodyBg:   'bg-white',
-      modalBg:      'bg-white',
-      accentText:   'text-blue-600',
-      accentModal:  'text-blue-600',
-      buttonBg:     'bg-blue-600',
-      buttonText:   'text-white'
-    },
-    'Interno Clínico': {
-      headerBg:     'bg-blue-50',
-      accent:       'text-blue-700',
-      cardHeaderBg: 'bg-blue-100',
-      cardBodyBg:   'bg-white',
-      modalBg:      'bg-blue-50',
-      accentText:   'text-blue-700',
-      accentModal:  'text-blue-700',
-      buttonBg:     'bg-blue-700',
-      buttonText:   'text-white'
-    },
-    'Médico General': {
-      headerBg:     'bg-green-50',
-      accent:       'text-green-700',
-      cardHeaderBg: 'bg-green-100',
-      cardBodyBg:   'bg-white',
-      modalBg:      'bg-green-50',
-      accentText:   'text-green-700',
-      accentModal:  'text-green-700',
-      buttonBg:     'bg-green-700',
-      buttonText:   'text-white'
-    },
-    'Residente': {
-      headerBg:     'bg-yellow-50',
-      accent:       'text-yellow-700',
-      cardHeaderBg: 'bg-yellow-100',
-      cardBodyBg:   'bg-white',
-      modalBg:      'bg-yellow-50',
-      accentText:   'text-yellow-700',
-      accentModal:  'text-yellow-700',
-      buttonBg:     'bg-yellow-700',
-      buttonText:   'text-white'
-    },
-    'Especialista': {
-      headerBg:     'bg-red-50',
-      accent:       'text-red-700',
-      cardHeaderBg: 'bg-red-100',
-      cardBodyBg:   'bg-white',
-      modalBg:      'bg-red-50',
-      accentText:   'text-red-700',
-      accentModal:  'text-red-700',
-      buttonBg:     'bg-red-700',
-      buttonText:   'text-white'
-    },
-    'Profesor Clínico': {
-      headerBg:     'bg-purple-50',
-      accent:       'text-purple-700',
-      cardHeaderBg: 'bg-purple-100',
-      cardBodyBg:   'bg-white',
-      modalBg:      'bg-purple-50',
-      accentText:   'text-purple-700',
-      accentModal:  'text-purple-700',
-      buttonBg:     'bg-purple-700',
-      buttonText:   'text-white'
-    }
-  };
-
-  const theme = themeConfig[currentRankInfo.rank];
-
-  useEffect(() => {
-    if (casesResolved > 0 && casesResolved >= nextThreshold) {
-      setShowPromo(true);
-    }
-  }, [casesResolved, nextThreshold]);
-
-  const filtered = allCases
+  // Las emergencias solo llegan como alerta, no esperan en la sala
+  const remaining = allCases
+    .filter(c => !c.emergency)
     .filter(c => c.difficulty === selectedDifficulty)
-    .filter(c => !resolvedIds.includes(c.id))
-    .slice(0, 2);
+    .filter(c => !resolvedIds.includes(c.id));
+  const visible = remaining.slice(0, 2);
 
-  const capitalize = s => s[0].toUpperCase() + s.slice(1);
+  let casesContent;
+  if (status === 'loading') {
+    casesContent = (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <CardSkeleton />
+        <CardSkeleton />
+      </div>
+    );
+  } else if (status === 'error') {
+    casesContent = (
+      <EmptyState icon={AlertTriangle} tone="bg-rose-50 text-rose-600" title="No se pudieron cargar los casos">
+        <p>Revisa tu conexión e inténtalo de nuevo.</p>
+        <Button onClick={reload} className="mt-4">Reintentar</Button>
+      </EmptyState>
+    );
+  } else if (visible.length === 0) {
+    casesContent = (
+      <EmptyState icon={CheckCircle2} tone="bg-emerald-50 text-emerald-600" title="¡Sala de espera vacía!">
+        Completaste todos los casos de esta dificultad. Elige otra para seguir practicando.
+      </EmptyState>
+    );
+  } else {
+    casesContent = (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {visible.map(c => (
+          <CaseCard key={c.id} caseItem={c} />
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <div className={`${theme.headerBg} min-h-screen`}>
-      {showPromo && (
-        <PromoModal
-          nextRank={nextRank}
-          theme={{
-            modalBg:     theme.modalBg,
-            accentText:  theme.accentText,
-            accentModal: theme.accentModal,
-            buttonBg:    theme.buttonBg,
-            buttonText:  theme.buttonText
-          }}
-          onClose={() => setShowPromo(false)}
-        />
-      )}
+    <div className="min-h-screen">
+      {promotion && <PromoModal rank={promotion} onClose={dismissPromotion} />}
 
-      <header className={`text-center space-y-1 py-6 ${theme.headerBg}`}>
-        <Stethoscope className={`mx-auto ${theme.accent}`} size={32} />
-        <h1 className={`${theme.accent} text-2xl font-bold`}>
-          Diagnóstico Clínico
-        </h1>
-        <p className="text-gray-600">Simulador Médico Interactivo</p>
+      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/80 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-2 px-4 sm:gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
+              <Stethoscope className="size-5" aria-hidden="true" />
+            </div>
+            <div className="sr-only min-w-0 leading-tight min-[380px]:not-sr-only">
+              <h1 className="truncate font-semibold text-slate-900">Diagnóstico Clínico</h1>
+              <p className="hidden text-xs text-slate-500 sm:block">Simulador médico interactivo</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold whitespace-nowrap text-amber-800 ring-1 ring-amber-600/20 ring-inset tabular-nums">
+              <Star className="size-4 fill-amber-400 text-amber-400" aria-hidden="true" />
+              {xp} XP
+            </span>
+            <MusicToggle />
+            <AccountMenu />
+          </div>
+        </div>
       </header>
 
-      <div className="container mx-auto px-4">
-        <div className="max-w-xl mx-auto rounded-lg overflow-hidden shadow">
-          <div className={`${theme.cardHeaderBg} px-6 py-4`}>
-            <div className="flex items-center justify-center space-x-2">
-              <GraduationCap className={theme.accent} />
-              <h2 className={`text-lg font-semibold ${theme.accent}`}>
-                {currentRankInfo.rank}
+      <main className="mx-auto max-w-5xl space-y-8 px-4 pt-6 pb-24">
+        <ActiveEmergencyBanner cases={allCases} />
+        <RankCard />
+
+        <section aria-labelledby="waiting-title" className="space-y-4">
+          <div className="flex items-end justify-between gap-2">
+            <div>
+              <h2 id="waiting-title" className="text-lg font-semibold text-slate-900">
+                Sala de espera
               </h2>
+              <p className="text-sm text-slate-500">Elige un paciente para comenzar la consulta</p>
             </div>
+            {status === 'ready' && (
+              <span className="text-sm whitespace-nowrap text-slate-500 tabular-nums">
+                {remaining.length} {remaining.length === 1 ? 'restante' : 'restantes'}
+              </span>
+            )}
           </div>
-          <div className={`${theme.cardBodyBg} px-6 py-6`}>
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Casos resueltos: {casesResolved}</span>
-              <span>Experiencia: {xp} XP</span>
-            </div>
-            <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden mb-2">
-              <div
-                className={`${theme.accent} h-2`}
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-            <p className="text-center text-xs text-gray-500">
-              {nextThreshold === Infinity
-                ? `¡Has alcanzado el nivel máximo!`
-                : `${nextThreshold - casesResolved} casos para ascender a ${nextRank}`}
-            </p>
-          </div>
-        </div>
-      </div>
 
-      <div className="container mx-auto p-4">
-        <div className="bg-white p-4 rounded border border-gray-200">
-          <label htmlFor="difficulty" className="block font-medium mb-2">
-            Seleccionar Dificultad
-          </label>
-          <select
-            id="difficulty"
-            value={selectedDifficulty}
-            onChange={e => setSelectedDifficulty(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2"
-          >
-            <option value="fácil">🟢 Fácil – Casos básicos y comunes</option>
-            <option value="normal">🟡 Normal – Casos con síntomas difusos</option>
-            <option value="difícil">🔴 Difícil – Casos complejos</option>
-          </select>
-        </div>
-      </div>
+          <DifficultyPicker value={selectedDifficulty} onChange={setSelectedDifficulty} />
 
-      <div className="container mx-auto p-4">
-        <h2 className="text-xl font-semibold mb-2">
-          Casos Disponibles –{' '}
-          <span className="font-normal">{capitalize(selectedDifficulty)}</span>
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          {filtered.map(c => (
-            <CaseCard key={c.id} caseItem={c} />
-          ))}
-        </div>
-      </div>
+          {casesContent}
+        </section>
+      </main>
     </div>
   );
 }
